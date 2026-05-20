@@ -42,10 +42,8 @@ function distributed_assemble!(K, g, dh, cv, fv, mat, u, ΓN, ch)
     n = ndofs_per_cell(dh)
     ke = zeros(n, n)
     ge = zeros(n)
-
     # start_assemble resets K and g
     assembler = start_assemble(K, g)
-
     # Loop over all cells in the grid
     for cell in CellIterator(dh)
         local_dofs = celldofs(cell)
@@ -53,12 +51,9 @@ function distributed_assemble!(K, g, dh, cv, fv, mat, u, ΓN, ch)
         ue = u[local_dofs] # element dofs
         assemble_element!(ke, ge, cell, cv, fv, mat, ue, ΓN)
         # TODO this changes
-        apply_local!(ke, ge, local_dofs, ch)
+        apply_local!(ke, ge, local_dofs, ch; apply_zero=true)
         assemble!(assembler, global_dofs, ke, ge)
     end
-    # Finally, for the `HYPREAssembler` we have to call
-    # `end_assemble` to construct the global sparse matrix and the global
-    # right hand side vector.
     end_assemble(assembler)
 end
 
@@ -150,7 +145,7 @@ solver = HYPRE.PCG(; Precond = precond)
 my_rank   = global_rank(dgrid)
 owned     = dh.ldof_to_rank .== my_rank          # pre-compute once outside all loops
 println("rank $my_rank")
-master() = my_rank==0
+master() = my_rank==1
 
 # Newton Solve
 let λᵢ=0; norm_res=0; @time for λ in 0.0:0.01:0.6
@@ -179,7 +174,6 @@ let λᵢ=0; norm_res=0; @time for λ in 0.0:0.01:0.6
         ΔΔu_h = HYPRE.solve(solver, K, g)
         FerriteDistributed.extract_local_part!(ΔΔu, ΔΔu_h, dh);
         apply_zero!(ΔΔu, dbcs)
-        # master() && (@show sum(iszero, ΔΔu), length(ΔΔu))
         Δu .-= ΔΔu
     end
     master() && println("Load step λ=$(round(λ; digits=2)) converged in $newton_itr iterations to $norm_res")
