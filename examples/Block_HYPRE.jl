@@ -38,6 +38,30 @@ function assemble_element!(ke, ge, cell, cv, fv, mat, ue, ΓN)
     end
 end
 
+function cauchy_stress(cell, cv, mat, ue)
+    σ_avg = zero(SymmetricTensor{2,3})
+    for qp in 1:getnquadpoints(cv)
+        ∇u = function_gradient(cv, qp, ue)
+        F  = one(∇u) + ∇u
+        C  = tdot(F)
+        S, _ = mat(C)
+        J  = det(F)
+        σ_avg += symmetric(F ⋅ S ⋅ F') / (J * getnquadpoints(cv))
+    end
+    return σ_avg
+end
+
+function max_principal_stress(dh, cv, mat, u)
+    S_principal = zeros(getncells(dh.grid))
+    for (i, cell) in enumerate(CellIterator(dh))
+        reinit!(cv, cell)
+        ue = u[celldofs(cell)]
+        σ = cauchy_stress(cell, cv, mat, ue)
+        S_principal[i] = maximum(eigvals(σ))
+    end
+    return S_principal
+end
+
 function distributed_assemble!(K, g, dh, cv, fv, mat, u, ΓN, ch)
     n = ndofs_per_cell(dh)
     ke = zeros(n, n)
@@ -62,7 +86,7 @@ MPI.Init()
 HYPRE.Init()
 
 # Generate a grid
-N = 16
+N = 32
 L = 1.0
 left = zero(Vec{3})
 right = L * ones(Vec{3})
@@ -165,7 +189,6 @@ let λᵢ=0; norm_res=0; @time for λ in 0.0:0.01:0.6
         FerriteDistributed.extract_local_part!(g_local, g, dh)
         # normg = sqrt(MPI.Allreduce(sum(abs2, g_local), +, comm))
         normg = sqrt(MPI.Allreduce(sum(abs2, @view g_local[owned]), MPI.SUM, comm))
-        master() && (@show normg)
 
         # check conv or exit
         normg < tol && (norm_res=normg; break)
@@ -183,11 +206,11 @@ let λᵢ=0; norm_res=0; @time for λ in 0.0:0.01:0.6
 end;
 end
 
+σ₁ = max_principal_stress(dh, cv, mat, u)
+
 PVTKGridFile("block_distributed", dh) do vtk
     write_solution(vtk, dh, u)
-    # For debugging purposes it can be helpful to enrich
-    # the visualization with some meta  information about
-    # the grid and its partitioning
+    write_cell_data(vtk, σ₁, "max. principal stress")
     vtk_shared_vertices(vtk, dgrid)
     vtk_shared_faces(vtk, dgrid)
     vtk_partitioning(vtk, dgrid)
