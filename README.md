@@ -1,5 +1,5 @@
-[![Test](https://github.com/marinlauber/UniversalMaterialModel.jl/actions/workflows/test.yml/badge.svg)](https://github.com/marinlauber/UniversalMaterialModel.jl/actions/workflows/test.yml)
-[![codecov.io](https://codecov.io/github/marinlauber/UniversalMaterialModel.jl/coverage.svg?branch=master)](https://codecov.io/github/marinlauber/UniversalMaterialModel.jl?branch=master)
+[![Test](https://github.com/peirlincklab/UniversalMaterialModel.jl/actions/workflows/test.yml/badge.svg)](https://github.com/peirlincklab/UniversalMaterialModel.jl/actions/workflows/test.yml)
+[![codecov.io](https://codecov.io/github/peirlincklab/UniversalMaterialModel.jl/coverage.svg?branch=master)](https://codecov.io/github/peirlincklab/UniversalMaterialModel.jl?branch=master)
 
 # UniversalMaterialModel.jl
 
